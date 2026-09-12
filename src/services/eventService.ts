@@ -40,17 +40,48 @@ function sanitizeForFirestore(obj: any): any {
   return obj;
 }
 
-// Đọc danh sách sự kiện từ LocalStorage an toàn (0ms)
+// Đọc danh sách sự kiện từ LocalStorage an toàn (0ms) kèm khôi phục dữ liệu từ mọi phiên làm việc
 function getLocalEvents(userId: string): EventItem[] {
   if (typeof window === "undefined" || !userId) return [];
   const localKey = `${LOCAL_KEY_PREFIX}${userId}`;
   const saved = localStorage.getItem(localKey);
-  if (!saved) return [];
-  try {
-    return JSON.parse(saved);
-  } catch {
-    return [];
+  if (saved) {
+    try {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    } catch {
+      //
+    }
   }
+
+  // Quét tìm dữ liệu sự kiện từ các khóa cũ hoặc session trước để không bao giờ bị mất dữ liệu
+  const allEventsMap = new Map<string, EventItem>();
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (key.includes("events") || key.startsWith("congivec_"))) {
+        const val = localStorage.getItem(key);
+        if (val) {
+          try {
+            const arr = JSON.parse(val);
+            if (Array.isArray(arr)) {
+              for (const item of arr) {
+                if (item && item.id && (item.title || item.startDateTime)) {
+                  allEventsMap.set(item.id, { ...item, userId });
+                }
+              }
+            }
+          } catch {}
+        }
+      }
+    }
+  } catch {}
+
+  const recovered = Array.from(allEventsMap.values());
+  if (recovered.length > 0) {
+    setLocalEvents(userId, recovered);
+  }
+  return recovered;
 }
 
 // Ghi danh sách sự kiện vào LocalStorage an toàn (0ms)
@@ -76,11 +107,10 @@ export const eventService = {
       return localEvents;
     }
 
-    // 2. Thử truy vấn Cloud Firestore để đồng bộ 2 chiều
+    // 2. Thử truy vấn Cloud Firestore để đồng bộ 2 chiều (Không dùng orderBy để tránh lỗi index)
     try {
       const colRef = collection(db, "users", userId, "events");
-      const q = query(colRef, orderBy("startDateTime", "asc"));
-      const snap = await withTimeout(getDocs(q), 2500);
+      const snap = await withTimeout(getDocs(colRef), 3000);
 
       const remoteEvents = snap.docs.map((d) => ({ id: d.id, ...d.data() } as EventItem));
 

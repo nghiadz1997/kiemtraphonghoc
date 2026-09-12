@@ -55,17 +55,48 @@ function sanitizeForFirestore(obj: any): any {
   return obj;
 }
 
-// Đọc công việc từ LocalStorage (0ms)
+// Đọc công việc từ LocalStorage (0ms) kèm khôi phục tự động mọi session cũ
 function getLocalTasks(userId: string): TaskItem[] {
   if (typeof window === "undefined" || !userId) return [];
   const localKey = `${LOCAL_KEY_PREFIX}${userId}`;
   const saved = localStorage.getItem(localKey);
-  if (!saved) return [];
-  try {
-    return JSON.parse(saved);
-  } catch {
-    return [];
+  if (saved) {
+    try {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    } catch {
+      //
+    }
   }
+
+  // Quét tìm dữ liệu công việc từ các khóa cũ hoặc session trước để không bao giờ bị mất công việc
+  const allTasksMap = new Map<string, TaskItem>();
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (key.includes("tasks") || key.startsWith("congivec_"))) {
+        const val = localStorage.getItem(key);
+        if (val) {
+          try {
+            const arr = JSON.parse(val);
+            if (Array.isArray(arr)) {
+              for (const item of arr) {
+                if (item && item.id && item.title && !item.startDateTime) {
+                  allTasksMap.set(item.id, { ...item, userId });
+                }
+              }
+            }
+          } catch {}
+        }
+      }
+    }
+  } catch {}
+
+  const recovered = Array.from(allTasksMap.values());
+  if (recovered.length > 0) {
+    setLocalTasks(userId, recovered);
+  }
+  return recovered;
 }
 
 // Ghi công việc vào LocalStorage (0ms)
@@ -92,8 +123,7 @@ export const taskService = {
 
     try {
       const colRef = collection(db, "users", userId, "tasks");
-      const q = query(colRef, orderBy("createdAt", "desc"));
-      const snap = await withTimeout(getDocs(q), 2500);
+      const snap = await withTimeout(getDocs(colRef), 3000);
 
       const remoteTasks = snap.docs.map((d) => ({ id: d.id, ...d.data() } as TaskItem));
 

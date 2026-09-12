@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
 import { useToast } from "@/hooks/useToast";
 import { notificationService } from "@/services/notificationService";
+import { syncService } from "@/services/syncService";
 import { Button } from "@/components/ui/Button";
 import {
   Settings as SettingsIcon,
@@ -17,7 +18,10 @@ import {
   LogOut,
   User,
   ShieldCheck,
-  Smartphone
+  Smartphone,
+  Cloud,
+  RefreshCw,
+  CheckCircle2
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -33,6 +37,31 @@ export default function SettingsPage() {
   const [defaultReminder, setDefaultReminder] = useState(
     user?.settings.defaultReminderMinutes ?? 15
   );
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<string | null>(null);
+
+  const handleSync = async () => {
+    if (!user) return;
+    setIsSyncing(true);
+    setSyncResult(null);
+    try {
+      const res = await syncService.syncAllWithCloud(user.uid);
+      if (res.success) {
+        success("Đã đồng bộ thành công!", `Đã lưu ${res.eventsCount} lịch và ${res.tasksCount} công việc lên Google Cloud.`);
+        setSyncResult(`Đã đồng bộ ${res.eventsCount} lịch & ${res.tasksCount} việc lúc ${new Date().toLocaleTimeString("vi-VN")}`);
+        setTimeout(() => {
+          window.location.reload();
+        }, 1000);
+      } else {
+        info("Thông báo đồng bộ", res.error || "Không thể kết nối Firebase");
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Có lỗi xảy ra";
+      info("Lỗi đồng bộ", msg);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   const handleToggleNotification = async () => {
     const nextState = !notificationEnabled;
@@ -113,6 +142,51 @@ export default function SettingsPage() {
               <ShieldCheck className="w-3.5 h-3.5" /> Dữ liệu được mã hóa và bảo mật riêng tư
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Lưu & Đồng bộ tài khoản Google Cloud */}
+      <div className="rounded-3xl bg-white dark:bg-[#0c0c0e] border border-slate-200 dark:border-zinc-800/80 p-6 shadow-xs space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-800 dark:text-zinc-200 flex items-center gap-2">
+            <Cloud className="w-4 h-4 text-emerald-500" /> Lưu Dữ Liệu & Đồng Bộ Đám Mây
+          </h3>
+          <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 rounded-full">
+            Đa thiết bị (PC & Điện thoại)
+          </span>
+        </div>
+
+        <p className="text-xs text-slate-500 dark:text-zinc-400">
+          Lưu toàn bộ lịch hẹn, thời khóa biểu và danh sách công việc của máy này lên tài khoản Google (<b className="text-slate-700 dark:text-zinc-200">{user?.email}</b>) để khi bạn đăng nhập trên điện thoại hoặc máy tính khác, dữ liệu sẽ tự động đồng bộ 100%.
+        </p>
+
+        <div className="p-4 rounded-2xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <div className="text-xs font-bold text-emerald-900 dark:text-emerald-200 flex items-center gap-1.5">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              Tài khoản liên kết: <span className="font-mono font-bold">{user?.email}</span>
+            </div>
+            {syncResult ? (
+              <div className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 mt-0.5">
+                {syncResult}
+              </div>
+            ) : (
+              <div className="text-[11px] text-slate-400 mt-0.5">
+                Bấm nút bên cạnh để tải toàn bộ lịch & việc của máy này lên Google Cloud
+              </div>
+            )}
+          </div>
+
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={handleSync}
+            disabled={isSyncing}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl whitespace-nowrap shadow-md shadow-emerald-500/20"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${isSyncing ? "animate-spin" : ""}`} />
+            {isSyncing ? "Đang đồng bộ..." : "Lưu vào tài khoản ngay"}
+          </Button>
         </div>
       </div>
 
