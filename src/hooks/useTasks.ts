@@ -62,11 +62,13 @@ export function useTasks() {
         const syncedIds = getSyncedTaskIds(user.uid);
         const currentLocal = getLocalTasks(user.uid);
 
-        // Tự động đẩy lên Cloud các task mới tạo trên máy này chưa từng sync
+        // Tự động đẩy lên Cloud toàn bộ các task cũ trên máy này chưa có trên Cloud
         for (const localTask of currentLocal) {
-          if (!remoteIdSet.has(localTask.id) && !syncedIds.has(localTask.id)) {
+          if (!remoteIdSet.has(localTask.id)) {
             const clean = sanitizeForFirestore(localTask);
-            setDoc(doc(db, "users", user.uid, "tasks", localTask.id), clean, { merge: true }).catch(() => {});
+            setDoc(doc(db, "users", user.uid, "tasks", localTask.id), clean, { merge: true }).catch((err) => {
+              console.warn("Auto-upload task to Firestore error:", err);
+            });
             remoteTasks.push(localTask);
             remoteIdSet.add(localTask.id);
           }

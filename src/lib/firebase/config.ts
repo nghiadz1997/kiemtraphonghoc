@@ -17,7 +17,8 @@ export const isFirebaseConfigured = true;
 
 const app: FirebaseApp = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 const auth: Auth = getAuth(app);
-const db: Firestore = getFirestore(app);
+const databaseId = process.env.NEXT_PUBLIC_FIREBASE_DATABASE_ID || "default";
+const db: Firestore = getFirestore(app, databaseId);
 
 export { app, auth, db };
 

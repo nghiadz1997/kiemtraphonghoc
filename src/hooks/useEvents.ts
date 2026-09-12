@@ -63,11 +63,13 @@ export function useEvents() {
         const syncedIds = getSyncedIds(user.uid);
         const currentLocal = getLocalEvents(user.uid);
 
-        // Tự động đẩy lên Cloud các sự kiện mới tạo trên máy này chưa từng sync
+        // Tự động đẩy lên Cloud toàn bộ các sự kiện cũ trên máy này chưa có trên Cloud
         for (const localEv of currentLocal) {
-          if (!remoteIdSet.has(localEv.id) && !syncedIds.has(localEv.id)) {
+          if (!remoteIdSet.has(localEv.id)) {
             const clean = sanitizeForFirestore(localEv);
-            setDoc(doc(db, "users", user.uid, "events", localEv.id), clean, { merge: true }).catch(() => {});
+            setDoc(doc(db, "users", user.uid, "events", localEv.id), clean, { merge: true }).catch((err) => {
+              console.warn("Auto-upload event to Firestore error:", err);
+            });
             remoteEvents.push(localEv);
             remoteIdSet.add(localEv.id);
           }
