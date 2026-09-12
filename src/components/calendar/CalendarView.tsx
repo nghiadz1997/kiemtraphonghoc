@@ -75,40 +75,40 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   };
 
   return (
-    <div className="rounded-3xl border border-slate-200 dark:border-zinc-800/80 bg-white dark:bg-[#0c0c0e] p-4 sm:p-6 shadow-xs space-y-4">
+    <div className="rounded-3xl border border-slate-200 dark:border-zinc-800/80 bg-white dark:bg-[#0c0c0e] p-3 sm:p-6 shadow-xs space-y-4 w-full max-w-full overflow-hidden">
       {/* Calendar Custom Toolbar */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-slate-100 dark:border-zinc-800">
         {/* Navigation buttons */}
         <div className="flex items-center gap-2">
           <button
             onClick={handleToday}
-            className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-zinc-700 hover:bg-slate-100 dark:hover:bg-zinc-800 text-xs font-bold text-slate-700 dark:text-zinc-200 transition cursor-pointer"
+            className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-zinc-700 hover:bg-slate-100 dark:hover:bg-zinc-800 text-xs font-bold text-slate-700 dark:text-zinc-200 transition cursor-pointer active:scale-95"
           >
             Hôm nay
           </button>
           <div className="flex items-center border border-slate-200 dark:border-zinc-700 rounded-xl overflow-hidden">
             <button
               onClick={handlePrev}
-              className="p-1.5 hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-600 dark:text-zinc-300 transition cursor-pointer"
+              className="p-1.5 hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-600 dark:text-zinc-300 transition cursor-pointer active:scale-90"
               title="Trước"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
             <button
               onClick={handleNext}
-              className="p-1.5 hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-600 dark:text-zinc-300 transition cursor-pointer"
+              className="p-1.5 hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-600 dark:text-zinc-300 transition cursor-pointer active:scale-90"
               title="Sau"
             >
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>
-          <span className="font-extrabold text-sm sm:text-base text-slate-900 dark:text-white capitalize ml-2">
+          <span className="font-extrabold text-sm sm:text-base text-slate-900 dark:text-white capitalize ml-2 truncate">
             {calendarTitle || "Lịch Sự Kiện"}
           </span>
         </div>
 
         {/* View Switchers: Tháng / Tuần / Ngày / Danh sách */}
-        <div className="flex items-center bg-slate-100 dark:bg-zinc-900 p-1 rounded-xl self-start sm:self-auto border border-transparent dark:border-zinc-800">
+        <div className="flex items-center bg-slate-100 dark:bg-zinc-900 p-1 rounded-xl self-start sm:self-auto border border-transparent dark:border-zinc-800 max-w-full overflow-x-auto no-scrollbar">
           {[
             { id: "dayGridMonth", label: "Tháng" },
             { id: "timeGridWeek", label: "Tuần" },
@@ -118,7 +118,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
             <button
               key={v.id}
               onClick={() => handleChangeView(v.id)}
-              className={`px-3 py-1 text-xs font-bold rounded-lg transition cursor-pointer ${
+              className={`px-3 py-1 text-xs font-bold rounded-lg transition cursor-pointer whitespace-nowrap active:scale-95 ${
                 currentView === v.id
                   ? "bg-white dark:bg-[#0c0c0e] text-blue-600 dark:text-blue-400 shadow-2xs border border-transparent dark:border-zinc-700"
                   : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white"
@@ -136,10 +136,10 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         {Object.entries(EVENT_TYPE_MAP).map(([key, info]) => (
           <div key={key} className="flex items-center gap-1.5">
             <span
-              className="w-2.5 h-2.5 rounded-full"
+              className="w-2.5 h-2.5 rounded-full shrink-0"
               style={{ backgroundColor: info.color }}
             />
-            <span className="text-[11px] text-slate-600 dark:text-slate-300 font-medium">
+            <span className="text-[11px] text-slate-600 dark:text-slate-300 font-medium whitespace-nowrap">
               {info.label}
             </span>
           </div>
@@ -147,7 +147,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       </div>
 
       {/* FullCalendar Component */}
-      <div className="calendar-container overflow-hidden">
+      <div className="calendar-container w-full max-w-full overflow-x-auto select-none no-scrollbar">
         <FullCalendar
           ref={calendarRef}
           plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin]}

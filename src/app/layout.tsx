@@ -10,17 +10,18 @@ export const metadata: Metadata = {
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "default",
+    statusBarStyle: "black-translucent",
     title: "CongiVec"
   }
 };
 
 export const viewport: Viewport = {
-  themeColor: "#2563eb",
+  themeColor: "#000000",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
-  userScalable: false
+  userScalable: false,
+  viewportFit: "cover"
 };
 
 export default function RootLayout({

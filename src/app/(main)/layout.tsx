@@ -181,19 +181,19 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   }
 
   return (
-    <div className="min-h-screen flex bg-slate-50/50 dark:bg-black">
+    <div className="min-h-screen flex flex-col lg:flex-row bg-slate-50/50 dark:bg-black w-full max-w-[100vw] overflow-x-hidden relative">
       {/* Desktop Sidebar */}
       <Sidebar onOpenQuickAdd={() => setIsQuickAddOpen(true)} />
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 pb-20 lg:pb-8">
+      <div className="flex-1 flex flex-col min-w-0 w-full max-w-full pb-24 lg:pb-8 overflow-x-hidden">
         <Header
           onOpenSearch={() => setIsSearchOpen(true)}
           onOpenQuickAdd={() => setIsQuickAddOpen(true)}
           onOpenInstallModal={() => setIsPwaModalOpen(true)}
         />
 
-        <main className="flex-1 p-4 sm:p-6 md:p-8 max-w-7xl mx-auto w-full">
+        <main className="flex-1 p-3 sm:p-6 md:p-8 max-w-7xl mx-auto w-full overflow-x-hidden">
           {children}
         </main>
       </div>
