@@ -19,6 +19,15 @@ export function useNotificationWatcher(events: EventItem[]) {
       }
       // Đăng ký Service Worker
       notificationService.registerServiceWorker();
+
+      // Khi người dùng mở ứng dụng, tự động xóa số thông báo trên icon
+      notificationService.clearBadge();
+
+      const handleFocus = () => {
+        notificationService.clearBadge();
+      };
+      window.addEventListener("focus", handleFocus);
+      return () => window.removeEventListener("focus", handleFocus);
     }
   }, []);
 

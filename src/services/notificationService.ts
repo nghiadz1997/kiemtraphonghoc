@@ -99,6 +99,9 @@ export const notificationService = {
         ...options
       };
 
+      // Đặt số 1 trên đầu icon App màn hình chính
+      this.setBadge(1);
+
       try {
         if ("serviceWorker" in navigator) {
           const reg = await navigator.serviceWorker.ready;
@@ -111,6 +114,37 @@ export const notificationService = {
       } catch (err) {
         console.warn("Lỗi gửi thông báo:", err);
       }
+    }
+  },
+
+  // Cập nhật số thông báo (Badge count) trên icon ứng dụng ở màn hình chính
+  async setBadge(count: number = 1): Promise<void> {
+    if (typeof window === "undefined") return;
+    try {
+      if ("setAppBadge" in navigator) {
+        if (count > 0) {
+          await (navigator as any).setAppBadge(count);
+        } else {
+          await (navigator as any).clearAppBadge();
+        }
+      }
+    } catch (e) {
+      console.warn("Lỗi đặt badge icon:", e);
+    }
+  },
+
+  // Xóa số thông báo trên icon ứng dụng khi người dùng mở ứng dụng
+  async clearBadge(): Promise<void> {
+    if (typeof window === "undefined") return;
+    try {
+      if ("clearAppBadge" in navigator) {
+        await (navigator as any).clearAppBadge();
+      }
+      if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({ type: "CLEAR_BADGE" });
+      }
+    } catch (e) {
+      console.warn("Lỗi xóa badge icon:", e);
     }
   },
 

@@ -55,6 +55,16 @@ self.addEventListener('message', (event) => {
       ...options
     };
     self.registration.showNotification(title, notificationOptions);
+
+    // Hiển thị số 1 (Badge) trên đầu icon App màn hình chính
+    if ('setAppBadge' in self.navigator) {
+      self.navigator.setAppBadge(1).catch(() => {});
+    }
+  } else if (event.data && event.data.type === 'CLEAR_BADGE') {
+    // Xóa số thông báo trên icon App khi người dùng đã mở xem
+    if ('clearAppBadge' in self.navigator) {
+      self.navigator.clearAppBadge().catch(() => {});
+    }
   }
 });
 
@@ -81,7 +91,10 @@ self.addEventListener('push', (event) => {
   };
 
   event.waitUntil(
-    self.registration.showNotification(data.title, options)
+    Promise.all([
+      self.registration.showNotification(data.title, options),
+      'setAppBadge' in self.navigator ? self.navigator.setAppBadge(1).catch(() => {}) : Promise.resolve()
+    ])
   );
 });
 
@@ -89,6 +102,11 @@ self.addEventListener('push', (event) => {
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const targetUrl = event.notification.data?.url || '/dashboard';
+
+  // Xóa số 1 trên icon khi đã chạm vào xem thông báo
+  if ('clearAppBadge' in self.navigator) {
+    self.navigator.clearAppBadge().catch(() => {});
+  }
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
