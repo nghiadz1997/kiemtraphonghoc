@@ -12,17 +12,6 @@ import { TaskItem, TaskStatus } from "@/types";
 
 const LOCAL_KEY_PREFIX = "congivec_real_tasks_";
 
-let isFirestoreUnavailable = false;
-
-function withTimeout<T>(promise: Promise<T>, ms: number = 600): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<T>((_, reject) =>
-      setTimeout(() => reject(new Error("Timeout kết nối Firestore")), ms)
-    )
-  ]);
-}
-
 export function computeTaskStatus(task: TaskItem): TaskStatus {
   if (task.completed) {
     return "completed";
@@ -40,7 +29,7 @@ export function computeTaskStatus(task: TaskItem): TaskStatus {
 }
 
 // Helper làm sạch dữ liệu trước khi gửi lên Cloud Firestore
-function sanitizeForFirestore(obj: any): any {
+export function sanitizeForFirestore(obj: any): any {
   if (obj === null || obj === undefined) return null;
   if (Array.isArray(obj)) return obj.map(sanitizeForFirestore);
   if (typeof obj === "object") {
@@ -56,7 +45,7 @@ function sanitizeForFirestore(obj: any): any {
 }
 
 // Đọc công việc từ LocalStorage (0ms) kèm khôi phục tự động mọi session cũ
-function getLocalTasks(userId: string): TaskItem[] {
+export function getLocalTasks(userId: string): TaskItem[] {
   if (typeof window === "undefined" || !userId) return [];
   const localKey = `${LOCAL_KEY_PREFIX}${userId}`;
   const saved = localStorage.getItem(localKey);
@@ -100,7 +89,7 @@ function getLocalTasks(userId: string): TaskItem[] {
 }
 
 // Ghi công việc vào LocalStorage (0ms)
-function setLocalTasks(userId: string, tasks: TaskItem[]): void {
+export function setLocalTasks(userId: string, tasks: TaskItem[]): void {
   if (typeof window === "undefined" || !userId) return;
   const localKey = `${LOCAL_KEY_PREFIX}${userId}`;
   try {
@@ -123,7 +112,7 @@ export const taskService = {
 
     try {
       const colRef = collection(db, "users", userId, "tasks");
-      const snap = await withTimeout(getDocs(colRef), 3000);
+      const snap = await getDocs(colRef);
 
       const remoteTasks = snap.docs.map((d) => ({ id: d.id, ...d.data() } as TaskItem));
 
@@ -151,13 +140,9 @@ export const taskService = {
         }
       }
 
-      isFirestoreUnavailable = false;
       return mergedList.map((t) => ({ ...t, status: computeTaskStatus(t) }));
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      if (msg.includes("not found") || msg.includes("Database")) {
-        isFirestoreUnavailable = true;
-      }
+      console.warn("Lưu ý kết nối Firestore tasks:", err);
       return localTasks.map((t) => ({ ...t, status: computeTaskStatus(t) }));
     }
   },
@@ -206,10 +191,7 @@ export const taskService = {
       const cleanData = sanitizeForFirestore(fullTask);
       const docRef = doc(db, "users", userId, "tasks", taskId);
       setDoc(docRef, cleanData, { merge: true }).catch((err) => {
-        const msg = String(err);
-        if (msg.includes("not found") || msg.includes("Database")) {
-          isFirestoreUnavailable = true;
-        }
+        console.warn("Lưu Firestore task:", err);
       });
     }
 
@@ -258,13 +240,10 @@ export const taskService = {
     setLocalTasks(userId, updated);
 
     // 2. Xóa ngầm trên Firestore
-    if (db && !isFirestoreUnavailable) {
+    if (db) {
       const docRef = doc(db, "users", userId, "tasks", taskId);
       deleteDoc(docRef).catch((err) => {
-        const msg = String(err);
-        if (msg.includes("not found") || msg.includes("Database") || msg.includes("offline")) {
-          isFirestoreUnavailable = true;
-        }
+        console.warn("Xóa Firestore task:", err);
       });
     }
   }

@@ -13,19 +13,8 @@ import { areTimeIntervalsOverlapping } from "@/utils/dateUtils";
 
 const LOCAL_KEY_PREFIX = "congivec_real_events_";
 
-let isFirestoreUnavailable = false;
-
-function withTimeout<T>(promise: Promise<T>, ms: number = 600): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<T>((_, reject) =>
-      setTimeout(() => reject(new Error("Timeout kết nối Firestore")), ms)
-    )
-  ]);
-}
-
 // Helper làm sạch dữ liệu trước khi gửi lên Cloud Firestore (loại bỏ hoàn toàn các trường có giá trị undefined)
-function sanitizeForFirestore(obj: any): any {
+export function sanitizeForFirestore(obj: any): any {
   if (obj === null || obj === undefined) return null;
   if (Array.isArray(obj)) return obj.map(sanitizeForFirestore);
   if (typeof obj === "object") {
@@ -41,7 +30,7 @@ function sanitizeForFirestore(obj: any): any {
 }
 
 // Đọc danh sách sự kiện từ LocalStorage an toàn (0ms) kèm khôi phục dữ liệu từ mọi phiên làm việc
-function getLocalEvents(userId: string): EventItem[] {
+export function getLocalEvents(userId: string): EventItem[] {
   if (typeof window === "undefined" || !userId) return [];
   const localKey = `${LOCAL_KEY_PREFIX}${userId}`;
   const saved = localStorage.getItem(localKey);
@@ -85,7 +74,7 @@ function getLocalEvents(userId: string): EventItem[] {
 }
 
 // Ghi danh sách sự kiện vào LocalStorage an toàn (0ms)
-function setLocalEvents(userId: string, events: EventItem[]): void {
+export function setLocalEvents(userId: string, events: EventItem[]): void {
   if (typeof window === "undefined" || !userId) return;
   const localKey = `${LOCAL_KEY_PREFIX}${userId}`;
   try {
@@ -110,7 +99,7 @@ export const eventService = {
     // 2. Thử truy vấn Cloud Firestore để đồng bộ 2 chiều (Không dùng orderBy để tránh lỗi index)
     try {
       const colRef = collection(db, "users", userId, "events");
-      const snap = await withTimeout(getDocs(colRef), 3000);
+      const snap = await getDocs(colRef);
 
       const remoteEvents = snap.docs.map((d) => ({ id: d.id, ...d.data() } as EventItem));
 
@@ -140,13 +129,9 @@ export const eventService = {
         }
       }
 
-      isFirestoreUnavailable = false;
       return mergedList;
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      if (msg.includes("not found") || msg.includes("Database")) {
-        isFirestoreUnavailable = true;
-      }
+      console.warn("Lưu ý kết nối Firestore events:", err);
       return localEvents;
     }
   },
@@ -186,10 +171,7 @@ export const eventService = {
       const cleanData = sanitizeForFirestore(fullEvent);
       const docRef = doc(db, "users", userId, "events", eventId);
       setDoc(docRef, cleanData, { merge: true }).catch((err) => {
-        const msg = String(err);
-        if (msg.includes("not found") || msg.includes("Database")) {
-          isFirestoreUnavailable = true;
-        }
+        console.warn("Lưu Firestore event:", err);
       });
     }
 
@@ -206,13 +188,10 @@ export const eventService = {
     setLocalEvents(userId, updated);
 
     // 2. Xóa ngầm trên Firestore nếu có
-    if (db && !isFirestoreUnavailable) {
+    if (db) {
       const docRef = doc(db, "users", userId, "events", eventId);
       deleteDoc(docRef).catch((err) => {
-        const msg = String(err);
-        if (msg.includes("not found") || msg.includes("Database") || msg.includes("offline")) {
-          isFirestoreUnavailable = true;
-        }
+        console.warn("Xóa Firestore event:", err);
       });
     }
   },
@@ -253,7 +232,7 @@ export const eventService = {
       }
 
       // Sync ngầm từng event lên Firestore
-      if (db && !isFirestoreUnavailable) {
+      if (db) {
         const cleanData = sanitizeForFirestore(fullEvent);
         const docRef = doc(db, "users", userId, "events", eventId);
         setDoc(docRef, cleanData, { merge: true }).catch(() => {});
@@ -261,7 +240,7 @@ export const eventService = {
     }
 
     // Xóa ngầm trên Firestore
-    if (db && !isFirestoreUnavailable) {
+    if (db) {
       for (const delId of toDeleteIds) {
         const docRef = doc(db, "users", userId, "events", delId);
         deleteDoc(docRef).catch(() => {});
@@ -363,7 +342,7 @@ export const eventService = {
     setLocalEvents(userId, updated);
 
     // Đồng bộ ngầm lên Firestore
-    if (db && !isFirestoreUnavailable) {
+    if (db) {
       for (const ev of createdEvents) {
         const cleanData = sanitizeForFirestore(ev);
         const docRef = doc(db, "users", userId, "events", ev.id);
