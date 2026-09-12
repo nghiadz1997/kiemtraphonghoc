@@ -65,40 +65,63 @@ function setLocalEvents(userId: string, events: EventItem[]): void {
 }
 
 export const eventService = {
-  // Lấy tất cả sự kiện thực tế của người dùng (Tức thì 0ms từ cache, đồng bộ ngầm nếu có Firestore)
+  // Lấy tất cả sự kiện: Tự động đồng bộ 2 chiều giữa Cloud Firestore và LocalStorage
   async getEvents(userId: string): Promise<EventItem[]> {
     if (!userId) return [];
 
-    // 1. Tải ngay lập tức từ Local Storage (0ms) để giao diện hiển thị tức thì không bị giật lag
-    const cachedEvents = getLocalEvents(userId);
+    // 1. Đọc ngay lập tức từ LocalStorage (0ms) để không bị đơ giao diện
+    const localEvents = getLocalEvents(userId);
 
-    // Nếu đã biết Firestore chưa kích hoạt trên Firebase Console, trả ngay 0ms không đợi timeout
-    if (isFirestoreUnavailable || !db) {
-      return cachedEvents;
+    if (!db) {
+      return localEvents;
     }
 
-    // 2. Thử truy vấn Firestore với timeout ngắn (600ms)
+    // 2. Thử truy vấn Cloud Firestore để đồng bộ 2 chiều
     try {
       const colRef = collection(db, "users", userId, "events");
       const q = query(colRef, orderBy("startDateTime", "asc"));
-      const snap = await withTimeout(getDocs(q), 600);
+      const snap = await withTimeout(getDocs(q), 2500);
 
-      if (!snap.empty) {
-        const remoteEvents = snap.docs.map((d) => ({ id: d.id, ...d.data() } as EventItem));
-        setLocalEvents(userId, remoteEvents);
-        return remoteEvents;
+      const remoteEvents = snap.docs.map((d) => ({ id: d.id, ...d.data() } as EventItem));
+
+      // Hợp nhất dữ liệu thông minh giữa Máy khách và Đám mây
+      const mergedMap = new Map<string, EventItem>();
+      for (const ev of localEvents) {
+        mergedMap.set(ev.id, ev);
       }
+      for (const ev of remoteEvents) {
+        mergedMap.set(ev.id, ev);
+      }
+
+      const mergedList = Array.from(mergedMap.values()).sort(
+        (a, b) => new Date(a.startDateTime).getTime() - new Date(b.startDateTime).getTime()
+      );
+
+      // Cập nhật lại LocalStorage để lần sau mở lên tức thì
+      setLocalEvents(userId, mergedList);
+
+      // Tự động đẩy các sự kiện ở máy này lên Đám mây nếu Firestore chưa có (Auto-upload to Cloud)
+      const remoteIdSet = new Set(remoteEvents.map((r) => r.id));
+      for (const ev of localEvents) {
+        if (!remoteIdSet.has(ev.id)) {
+          const cleanData = sanitizeForFirestore(ev);
+          const docRef = doc(db, "users", userId, "events", ev.id);
+          setDoc(docRef, cleanData, { merge: true }).catch(() => {});
+        }
+      }
+
+      isFirestoreUnavailable = false;
+      return mergedList;
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      if (msg.includes("not found") || msg.includes("Database") || msg.includes("Timeout") || msg.includes("offline")) {
-        isFirestoreUnavailable = true; // Ghi nhớ để các lần sau tải tức thì 0ms
+      if (msg.includes("not found") || msg.includes("Database")) {
+        isFirestoreUnavailable = true;
       }
+      return localEvents;
     }
-
-    return cachedEvents;
   },
 
-  // Tạo hoặc cập nhật sự kiện: LƯU TỨC THÌ (0ms) vào LocalStorage, đồng bộ ngầm không chặn người dùng
+  // Tạo hoặc cập nhật sự kiện: LƯU TỨC THÌ (0ms) vào LocalStorage, đồng bộ ngầm lên Firestore
   async saveEvent(
     userId: string,
     event: Omit<EventItem, "id" | "createdAt" | "updatedAt"> & { id?: string }
@@ -116,7 +139,7 @@ export const eventService = {
       updatedAt: now
     };
 
-    // 1. Lưu tức thì vào LocalStorage (0ms) - không bao giờ bị delay hay mất dữ liệu
+    // 1. Lưu tức thì vào LocalStorage (0ms)
     const current = getLocalEvents(userId);
     const existingIndex = current.findIndex((e) => e.id === eventId);
     let updated: EventItem[];
@@ -128,13 +151,13 @@ export const eventService = {
     }
     setLocalEvents(userId, updated);
 
-    // 2. Đồng bộ ngầm lên Firestore (fire-and-forget, không await để loại bỏ hoàn toàn delay)
-    if (db && !isFirestoreUnavailable) {
+    // 2. Đồng bộ ngầm lên Firestore (fire-and-forget)
+    if (db) {
       const cleanData = sanitizeForFirestore(fullEvent);
       const docRef = doc(db, "users", userId, "events", eventId);
       setDoc(docRef, cleanData, { merge: true }).catch((err) => {
         const msg = String(err);
-        if (msg.includes("not found") || msg.includes("Database") || msg.includes("offline")) {
+        if (msg.includes("not found") || msg.includes("Database")) {
           isFirestoreUnavailable = true;
         }
       });

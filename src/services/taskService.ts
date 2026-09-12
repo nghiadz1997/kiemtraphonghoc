@@ -80,36 +80,56 @@ function setLocalTasks(userId: string, tasks: TaskItem[]): void {
 }
 
 export const taskService = {
-  // Lấy tất cả công việc (Tức thì 0ms từ LocalStorage)
+  // Lấy tất cả công việc: Tự động đồng bộ 2 chiều giữa Cloud Firestore và LocalStorage
   async getTasks(userId: string): Promise<TaskItem[]> {
     if (!userId) return [];
 
-    let tasks = getLocalTasks(userId);
+    const localTasks = getLocalTasks(userId);
 
-    if (isFirestoreUnavailable || !db) {
-      return tasks.map((t) => ({ ...t, status: computeTaskStatus(t) }));
+    if (!db) {
+      return localTasks.map((t) => ({ ...t, status: computeTaskStatus(t) }));
     }
 
     try {
       const colRef = collection(db, "users", userId, "tasks");
       const q = query(colRef, orderBy("createdAt", "desc"));
-      const snap = await withTimeout(getDocs(q), 600);
+      const snap = await withTimeout(getDocs(q), 2500);
 
-      if (!snap.empty) {
-        tasks = snap.docs.map((d) => ({ id: d.id, ...d.data() } as TaskItem));
-        setLocalTasks(userId, tasks);
+      const remoteTasks = snap.docs.map((d) => ({ id: d.id, ...d.data() } as TaskItem));
+
+      const mergedMap = new Map<string, TaskItem>();
+      for (const t of localTasks) {
+        mergedMap.set(t.id, t);
       }
+      for (const t of remoteTasks) {
+        mergedMap.set(t.id, t);
+      }
+
+      const mergedList = Array.from(mergedMap.values()).sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+
+      setLocalTasks(userId, mergedList);
+
+      // Tự động đẩy task máy này lên Firestore nếu Firestore chưa có
+      const remoteIdSet = new Set(remoteTasks.map((r) => r.id));
+      for (const t of localTasks) {
+        if (!remoteIdSet.has(t.id)) {
+          const cleanData = sanitizeForFirestore(t);
+          const docRef = doc(db, "users", userId, "tasks", t.id);
+          setDoc(docRef, cleanData, { merge: true }).catch(() => {});
+        }
+      }
+
+      isFirestoreUnavailable = false;
+      return mergedList.map((t) => ({ ...t, status: computeTaskStatus(t) }));
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      if (msg.includes("not found") || msg.includes("Database") || msg.includes("Timeout") || msg.includes("offline")) {
+      if (msg.includes("not found") || msg.includes("Database")) {
         isFirestoreUnavailable = true;
       }
+      return localTasks.map((t) => ({ ...t, status: computeTaskStatus(t) }));
     }
-
-    return tasks.map((t) => ({
-      ...t,
-      status: computeTaskStatus(t)
-    }));
   },
 
   // Tạo hoặc lưu công việc: TỨC THÌ (0ms), đồng bộ ngầm
@@ -152,12 +172,12 @@ export const taskService = {
     setLocalTasks(userId, updated);
 
     // 2. Đồng bộ ngầm lên Firestore (không block UI)
-    if (db && !isFirestoreUnavailable) {
+    if (db) {
       const cleanData = sanitizeForFirestore(fullTask);
       const docRef = doc(db, "users", userId, "tasks", taskId);
       setDoc(docRef, cleanData, { merge: true }).catch((err) => {
         const msg = String(err);
-        if (msg.includes("not found") || msg.includes("Database") || msg.includes("offline")) {
+        if (msg.includes("not found") || msg.includes("Database")) {
           isFirestoreUnavailable = true;
         }
       });
