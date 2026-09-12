@@ -166,19 +166,21 @@ export const eventService = {
     }
     setLocalEvents(userId, updated);
 
-    // 2. Đồng bộ ngầm lên Firestore (fire-and-forget)
+    // 2. Lưu trực tiếp và tự động vào Cloud Firestore
     if (db) {
       const cleanData = sanitizeForFirestore(fullEvent);
       const docRef = doc(db, "users", userId, "events", eventId);
-      setDoc(docRef, cleanData, { merge: true }).catch((err) => {
+      try {
+        await setDoc(docRef, cleanData, { merge: true });
+      } catch (err) {
         console.warn("Lưu Firestore event:", err);
-      });
+      }
     }
 
     return fullEvent;
   },
 
-  // Xóa sự kiện: XÓA TỨC THÌ (0ms), đồng bộ ngầm
+  // Xóa sự kiện: XÓA TỨC THÌ (0ms), đồng bộ trực tiếp lên Cloud
   async deleteEvent(userId: string, eventId: string): Promise<void> {
     if (!userId || !eventId) return;
 
@@ -187,12 +189,14 @@ export const eventService = {
     const updated = current.filter((e) => e.id !== eventId);
     setLocalEvents(userId, updated);
 
-    // 2. Xóa ngầm trên Firestore nếu có
+    // 2. Xóa trực tiếp trên Firestore
     if (db) {
       const docRef = doc(db, "users", userId, "events", eventId);
-      deleteDoc(docRef).catch((err) => {
+      try {
+        await deleteDoc(docRef);
+      } catch (err) {
         console.warn("Xóa Firestore event:", err);
-      });
+      }
     }
   },
 
@@ -213,6 +217,8 @@ export const eventService = {
       current = current.filter((e) => !deleteSet.has(e.id));
     }
 
+    const promises: Promise<any>[] = [];
+
     // Upsert các sự kiện mới/đã sửa
     for (const item of toSave) {
       const eventId = item.id || `evt_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
@@ -231,24 +237,28 @@ export const eventService = {
         current.unshift(fullEvent);
       }
 
-      // Sync ngầm từng event lên Firestore
+      // Lưu trực tiếp lên Cloud Firestore
       if (db) {
         const cleanData = sanitizeForFirestore(fullEvent);
         const docRef = doc(db, "users", userId, "events", eventId);
-        setDoc(docRef, cleanData, { merge: true }).catch(() => {});
+        promises.push(setDoc(docRef, cleanData, { merge: true }).catch(() => {}));
       }
     }
 
-    // Xóa ngầm trên Firestore
-    if (db) {
+    // Xóa trực tiếp trên Cloud Firestore
+    if (db && toDeleteIds.length > 0) {
       for (const delId of toDeleteIds) {
         const docRef = doc(db, "users", userId, "events", delId);
-        deleteDoc(docRef).catch(() => {});
+        promises.push(deleteDoc(docRef).catch(() => {}));
       }
     }
 
     // Lưu một lần duy nhất vào LocalStorage (0ms)
     setLocalEvents(userId, current);
+
+    if (promises.length > 0) {
+      await Promise.all(promises);
+    }
 
     return current;
   },
@@ -341,13 +351,14 @@ export const eventService = {
     const updated = [...createdEvents, ...current];
     setLocalEvents(userId, updated);
 
-    // Đồng bộ ngầm lên Firestore
-    if (db) {
-      for (const ev of createdEvents) {
+    // Đồng bộ trực tiếp lên Firestore
+    if (db && createdEvents.length > 0) {
+      const promises = createdEvents.map((ev) => {
         const cleanData = sanitizeForFirestore(ev);
         const docRef = doc(db, "users", userId, "events", ev.id);
-        setDoc(docRef, cleanData, { merge: true }).catch(() => {});
-      }
+        return setDoc(docRef, cleanData, { merge: true }).catch(() => {});
+      });
+      await Promise.all(promises);
     }
 
     return createdEvents;

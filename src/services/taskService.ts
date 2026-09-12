@@ -186,13 +186,15 @@ export const taskService = {
     }
     setLocalTasks(userId, updated);
 
-    // 2. Đồng bộ ngầm lên Firestore (không block UI)
+    // 2. Lưu trực tiếp và tự động vào Cloud Firestore
     if (db) {
       const cleanData = sanitizeForFirestore(fullTask);
       const docRef = doc(db, "users", userId, "tasks", taskId);
-      setDoc(docRef, cleanData, { merge: true }).catch((err) => {
+      try {
+        await setDoc(docRef, cleanData, { merge: true });
+      } catch (err) {
         console.warn("Lưu Firestore task:", err);
-      });
+      }
     }
 
     return fullTask;
@@ -230,7 +232,7 @@ export const taskService = {
     });
   },
 
-  // Xóa công việc: TỨC THÌ (0ms)
+  // Xóa công việc: XÓA TỨC THÌ (0ms), đồng bộ trực tiếp lên Cloud
   async deleteTask(userId: string, taskId: string): Promise<void> {
     if (!userId || !taskId) return;
 
@@ -239,12 +241,14 @@ export const taskService = {
     const updated = current.filter((t) => t.id !== taskId);
     setLocalTasks(userId, updated);
 
-    // 2. Xóa ngầm trên Firestore
+    // 2. Xóa trực tiếp trên Firestore
     if (db) {
       const docRef = doc(db, "users", userId, "tasks", taskId);
-      deleteDoc(docRef).catch((err) => {
+      try {
+        await deleteDoc(docRef);
+      } catch (err) {
         console.warn("Xóa Firestore task:", err);
-      });
+      }
     }
   }
 };
