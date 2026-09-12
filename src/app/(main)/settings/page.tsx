@@ -6,6 +6,8 @@ import { useTheme } from "@/hooks/useTheme";
 import { useToast } from "@/hooks/useToast";
 import { notificationService } from "@/services/notificationService";
 import { syncService } from "@/services/syncService";
+import { eventService } from "@/services/eventService";
+import { taskService } from "@/services/taskService";
 import { Button } from "@/components/ui/Button";
 import {
   Settings as SettingsIcon,
@@ -21,7 +23,10 @@ import {
   Smartphone,
   Cloud,
   RefreshCw,
-  CheckCircle2
+  CheckCircle2,
+  Copy,
+  ArrowRightLeft,
+  Check
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -60,6 +65,56 @@ export default function SettingsPage() {
       info("Lỗi đồng bộ", msg);
     } finally {
       setIsSyncing(false);
+    }
+  };
+
+  const [syncCodeInput, setSyncCodeInput] = useState("");
+  const [showCodeInput, setShowCodeInput] = useState(false);
+  const [isCopied, setIsCopied] = useState(false);
+
+  const handleExportSyncCode = async () => {
+    if (!user) return;
+    try {
+      const events = await eventService.getEvents(user.uid);
+      const tasks = await taskService.getTasks(user.uid);
+      const payload = {
+        v: 1,
+        time: Date.now(),
+        userEmail: user.email,
+        events,
+        tasks
+      };
+      const jsonStr = JSON.stringify(payload);
+      const base64 = btoa(unescape(encodeURIComponent(jsonStr)));
+      await navigator.clipboard.writeText(base64);
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 3000);
+      success("Đã sao chép mã đồng bộ!", `Gồm ${events.length} lịch và ${tasks.length} việc. Hãy gửi mã này sang điện thoại và dán vào là xong!`);
+    } catch {
+      info("Không thể sao chép", "Vui lòng thử lại.");
+    }
+  };
+
+  const handleImportSyncCode = async () => {
+    if (!user || !syncCodeInput.trim()) return;
+    try {
+      const jsonStr = decodeURIComponent(escape(atob(syncCodeInput.trim())));
+      const payload = JSON.parse(jsonStr);
+      if (!payload.events && !payload.tasks) {
+        throw new Error("Mã không hợp lệ");
+      }
+      if (Array.isArray(payload.events)) {
+        localStorage.setItem(`congivec_real_events_${user.uid}`, JSON.stringify(payload.events));
+      }
+      if (Array.isArray(payload.tasks)) {
+        localStorage.setItem(`congivec_real_tasks_${user.uid}`, JSON.stringify(payload.tasks));
+      }
+      success("Đã nhập thành công!", `Đã chuyển ${payload.events?.length || 0} lịch và ${payload.tasks?.length || 0} công việc vào máy này!`);
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+    } catch {
+      info("Mã không đúng định dạng", "Vui lòng kiểm tra lại mã đồng bộ đã sao chép.");
     }
   };
 
@@ -188,6 +243,58 @@ export default function SettingsPage() {
             {isSyncing ? "Đang đồng bộ..." : "Lưu vào tài khoản ngay"}
           </Button>
         </div>
+
+        {/* Chuyển nhanh qua Mã Đồng Bộ */}
+        <div className="pt-3 border-t border-slate-200/60 dark:border-zinc-800/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <div className="text-xs font-bold text-slate-800 dark:text-zinc-200 flex items-center gap-1.5">
+              <ArrowRightLeft className="w-3.5 h-3.5 text-blue-500" />
+              Chuyển nhanh sang điện thoại bằng Mã Đồng Bộ:
+            </div>
+            <div className="text-[11px] text-slate-400">
+              Không cần chờ đám mây: Sao chép mã trên máy tính ➔ Dán vào điện thoại là có đủ lịch và việc ngay!
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleExportSyncCode}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 text-xs font-bold transition cursor-pointer"
+            >
+              {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+              <span>{isCopied ? "Đã sao chép!" : "Sao chép mã máy này"}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowCodeInput(!showCodeInput)}
+              className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-zinc-800 hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-700 dark:text-zinc-300 text-xs font-bold transition cursor-pointer"
+            >
+              Dán mã từ máy khác
+            </button>
+          </div>
+        </div>
+
+        {showCodeInput && (
+          <div className="p-3 rounded-2xl bg-slate-100/80 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 space-y-2 animate-fade-in">
+            <label className="text-xs font-bold text-slate-700 dark:text-zinc-300">
+              Dán mã đồng bộ đã sao chép từ thiết bị kia vào đây:
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={syncCodeInput}
+                onChange={(e) => setSyncCodeInput(e.target.value)}
+                placeholder="Dán mã đồng bộ vào đây..."
+                className="flex-1 px-3 py-2 text-xs rounded-xl border border-slate-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <Button variant="primary" size="sm" onClick={handleImportSyncCode} className="font-bold">
+                Áp dụng mã
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Chế độ Giao diện: Sáng / Tối / Tự động */}
