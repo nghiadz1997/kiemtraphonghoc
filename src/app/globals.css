@@ -1,0 +1,164 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --border: #e2e8f0;
+  --primary: #2563eb;
+  --primary-glow: rgba(37, 99, 235, 0.15);
+}
+
+.dark {
+  --background: #000000;
+  --foreground: #ffffff;
+  --card: #09090b;
+  --card-foreground: #ffffff;
+  --border: #27272a;
+  --primary: #3b82f6;
+  --primary-glow: rgba(59, 130, 246, 0.25);
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-tap-highlight-color: transparent;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: 'Be Vietnam Pro', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh;
+  text-rendering: optimizeLegibility;
+}
+
+/* Hiệu ứng nền Ambient Mesh cho Dark Mode - Tối ưu 60-120fps không giật lag */
+.dark body {
+  background-color: #000000 !important;
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(37, 99, 235, 0.15) 0px, transparent 40%),
+    radial-gradient(at 100% 0%, rgba(139, 92, 246, 0.12) 0px, transparent 40%),
+    radial-gradient(at 50% 100%, rgba(30, 58, 138, 0.1) 0px, transparent 50%);
+}
+
+/* Light mode mesh nền nhẹ nhàng */
+body:not(.dark) {
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(219, 234, 254, 0.5) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(243, 232, 255, 0.4) 0px, transparent 50%);
+}
+
+/* Modal and Element Smooth Animations */
+@keyframes modalEnter {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-modal-enter {
+  animation: modalEnter 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.18s ease-out forwards;
+  will-change: opacity;
+}
+
+/* Tùy chỉnh thanh cuộn đẹp mắt */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.3);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.5);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Tùy biến FullCalendar cho Dark Mode True Black */
+.dark .fc {
+  --fc-border-color: #27272a;
+  --fc-page-bg-color: #000000;
+  --fc-neutral-bg-color: #09090b;
+  --fc-list-event-hover-bg-color: #18181b;
+  --fc-today-bg-color: rgba(59, 130, 246, 0.12);
+}
+
+.dark .fc-theme-standard th {
+  border-color: #27272a;
+  background-color: #09090b;
+  color: #a1a1aa;
+}
+
+.dark .fc-theme-standard td {
+  border-color: #27272a;
+}
+
+.dark .fc-daygrid-day-number {
+  color: #e4e4e7;
+  font-weight: 500;
+}
+
+.dark .fc-col-header-cell-cushion {
+  color: #a1a1aa;
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+}
+
+.dark .fc-list-day-cushion {
+  background-color: #18181b !important;
+  color: #ffffff !important;
+}
+
+.dark .fc-list-event:hover td {
+  background-color: #18181b !important;
+}
+
+/* Card Glow Effect */
+.glow-on-hover {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glow-on-hover:hover {
+  box-shadow: 0 10px 25px -5px rgba(59, 130, 246, 0.15), 0 8px 10px -6px rgba(59, 130, 246, 0.1);
+}
+
+.dark .glow-on-hover:hover {
+  box-shadow: 0 10px 30px -5px rgba(59, 130, 246, 0.25), 0 8px 10px -6px rgba(59, 130, 246, 0.2);
+}
