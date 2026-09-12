@@ -7,8 +7,10 @@ export function getFirebaseErrorMessage(error: unknown): string {
   switch (code) {
     case "auth/operation-not-allowed":
       return "Tính năng Đăng nhập bằng Google chưa được BẬT trên Firebase Console. Vui lòng vào Firebase Console > Authentication > Sign-in method > Google và bật (Enable) lên.";
-    case "auth/unauthorized-domain":
-      return "Tên miền hiện tại (Domain) chưa được cấp phép trong Firebase Console. Vui lòng vào Firebase Console > Authentication > Settings > Authorized Domains và thêm 'localhost' hoặc IP truy cập.";
+    case "auth/unauthorized-domain": {
+      const currentHost = typeof window !== "undefined" ? window.location.hostname : "tên miền Vercel của bạn";
+      return `Tên miền '${currentHost}' chưa được cấp phép trong Firebase Console. Vui lòng vào Firebase Console > Authentication > Settings > Authorized domains > Bấm 'Add domain' và nhập '${currentHost}' vào.`;
+    }
     case "auth/popup-blocked":
       return "Trình duyệt đã chặn cửa sổ Pop-up Google. Vui lòng bấm vào icon góc phải thanh địa chỉ duyệt web và chọn 'Luôn cho phép cửa sổ bật lên (Allow popups)'.";
     case "auth/popup-closed-by-user":
